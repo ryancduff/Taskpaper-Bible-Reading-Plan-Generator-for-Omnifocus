@@ -11,8 +11,13 @@ for file in ${PlansFolder}/*; do
 	PlansList[$PlanTitle]=$PlansFolder"/"$FileName
 done
 
-read -p "Enter a title for the reading plan: " Title
-read -p "Enter a year and month for the reading plan (YYYY-MM): " YearMonth
+Tomorrow=$(date -d "today + 1 days" "+%Y-%m-%d")
+
+read -p "Enter a title for the reading plan [Bible Reading Plan]: " Title
+Title=${Title:-"Bible Reading Plan"}
+
+read -p "Enter a start date [$Tomorrow]: " StartDate
+StartDate=${StartDate:-"$Tomorrow"}
 
 PS3="Choose a reading plan: "
 select plan in "${!PlansList[@]}";
@@ -21,22 +26,17 @@ do
 	break;
 done
 
-declare -A ReadingPlanData
-declare -a ReadingPlanOrder
-
-while IFS='=' read key value; do
-	ReadingPlanData[$key]=$value
-	if [[ $key =~ ^[0-9]+$ ]]; then
-		ReadingPlanOrder+=("$key")
-	fi
-done < "$PlanFile"
-
-Estimate=${ReadingPlanData[estimate]}
-Filename="${Title} ${YearMonth}"
+Estimate=$(sed -n '$p' "$PlanFile")
+Days=$(sed -n '$=' "$PlanFile")
+Filename="${Title}"
 
 echo "- Bible Plan - "$Title" @parallel(true) @autodone(true)" >> "$Filename.taskpaper"
-for Day in "${ReadingPlanOrder[@]}"
-do
-	Date="${YearMonth}-${Day}"
-	echo "  - ${ReadingPlanData[$Day]} @defer($Date) @due($Date 10pm) @estimate($Estimate)" >> "$Filename.taskpaper"
-done
+
+Day=0
+while IFS= read -r line; do
+	Date=$(date -d "$StartDate + $Day days" "+%Y-%m-%d")
+	((Day++))
+	if [ $Day -lt $Days ]; then
+		echo "  - $line @defer($Date) @due($Date 10pm) @estimate($Estimate)" >> "$Filename.taskpaper"  
+	fi
+done < "$PlanFile"
